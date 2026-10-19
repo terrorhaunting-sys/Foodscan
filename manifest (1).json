@@ -1,0 +1,18 @@
+{
+  "name": "Pocket Food Tracker",
+  "short_name": "Food Tracker",
+  "description": "Private local-first food and nutrition diary",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f6f1",
+  "theme_color": "#173f30",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

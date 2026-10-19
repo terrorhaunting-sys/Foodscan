@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#173f30">
+  <meta name="description" content="A private, local-first food and nutrition diary.">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <title>Pocket Food Tracker</title>
+</head>
+<body>
+<header class="app-header">
+  <div class="brand-row"><div class="brand-mark">PF</div><div><p class="eyebrow">YOUR PRIVATE FOOD DIARY</p><h1>Pocket Food Tracker</h1></div></div>
+  <p class="header-note">Log what you eat. Check the data. Keep it on this device.</p>
+</header>
+
+<main>
+  <section class="card date-card">
+    <label for="diaryDate">Diary date</label>
+    <input id="diaryDate" type="date">
+    <button class="button ghost small" id="todayBtn" type="button">Today</button>
+  </section>
+
+  <nav class="tabs" aria-label="App sections">
+    <button class="tab active" data-page="diary">Diary</button>
+    <button class="tab" data-page="add">Add food</button>
+    <button class="tab" data-page="foods">My foods</button>
+    <button class="tab" data-page="reports">Reports</button>
+    <button class="tab" data-page="settings">Goals & data</button>
+  </nav>
+
+  <section class="page active" id="page-diary">
+    <div class="section-heading"><div><p class="eyebrow">DAILY OVERVIEW</p><h2>Today's nutrition</h2></div><span class="privacy-pill">Saved locally</span></div>
+    <div class="calorie-card">
+      <div><span class="muted">Energy</span><div class="big-number"><span id="totalKcal">0</span><small> kcal</small></div><p id="calorieGoalText" class="small muted">Goal not set</p></div>
+      <div class="ring" id="calorieRing" aria-label="Calories compared with goal"><span id="caloriePercent">—</span></div>
+    </div>
+    <div class="macro-grid">
+      <div class="macro"><span class="dot protein"></span><span>Protein</span><strong><span id="totalProtein">—</span><small> g</small></strong><div class="bar"><i id="proteinBar"></i></div><small class="muted" id="proteinGoalText">Goal not set</small></div>
+      <div class="macro"><span class="dot carbs"></span><span>Carbs</span><strong><span id="totalCarbs">—</span><small> g</small></strong><div class="bar"><i id="carbsBar"></i></div><small class="muted" id="carbsGoalText">Goal not set</small></div>
+      <div class="macro"><span class="dot fat"></span><span>Fat</span><strong><span id="totalFat">—</span><small> g</small></strong><div class="bar"><i id="fatBar"></i></div><small class="muted" id="fatGoalText">Goal not set</small></div>
+      <div class="macro"><span class="dot fibre"></span><span>Fibre</span><strong><span id="totalFibre">—</span><small> g</small></strong><div class="bar"><i id="fibreBar"></i></div><small class="muted" id="fibreGoalText">Goal not set</small></div>
+    </div>
+    <div class="card inset">
+      <div class="section-heading"><div><h3>Micronutrients</h3><p class="muted small">Totals shown only where food data is available.</p></div></div>
+      <div class="micro-grid" id="microTotals"></div>
+    </div>
+    <div class="section-heading meal-heading"><h2>Food entries</h2><button class="button primary small" data-go="add">+ Add food</button></div>
+    <div id="todayEntries" class="entry-list"></div>
+  </section>
+
+  <section class="page" id="page-add">
+    <p class="eyebrow">FOOD ENTRY</p><h2>Add food</h2>
+    <div class="card">
+      <h3>Scan or search a packaged product</h3>
+      <p class="muted small">Barcode lookup needs internet. Compare returned data with your package label before saving.</p>
+      <div class="form-row">
+        <label class="field grow">Barcode number<input id="barcodeInput" inputmode="numeric" autocomplete="off" placeholder="Scan or type barcode"></label>
+        <button class="button primary align-end" id="lookupBtn" type="button">Look up</button>
+      </div>
+      <div class="button-row">
+        <button class="button secondary" id="cameraBtn" type="button">Open barcode camera</button>
+        <button class="button ghost" id="stopCameraBtn" type="button" hidden>Stop camera</button>
+      </div>
+      <div id="cameraReader" class="camera-reader" hidden></div>
+      <p id="lookupStatus" class="status" role="status"></p>
+      <div id="productPreview" class="product-preview" hidden></div>
+    </div>
+
+    <div class="card">
+      <div class="section-heading"><h3>Nutrition and portion</h3><span id="dataStatus" class="data-badge unknown">Unverified</span></div>
+      <p class="muted small">Enter label values for the basis amount. Missing values stay unknown, not zero. Choose per 100 g, per 100 ml, or per serving as printed on the label.</p>
+      <form id="foodForm">
+        <label class="field">Food name *<input id="foodName" required maxlength="120" placeholder="e.g. Brown bread"></label>
+        <div class="form-grid two">
+          <label class="field">Meal<select id="meal"><option>Breakfast</option><option>Lunch</option><option>Dinner</option><option>Snack</option></select></label>
+          <label class="field">Amount eaten (g or ml) *<input id="amount" type="number" min="0.01" step="any" value="100" required></label>
+        </div>
+        <div class="form-grid two">
+          <label class="field">Nutrition basis<select id="basisType"><option value="100g">Per 100 g</option><option value="100ml">Per 100 ml</option><option value="serving">Per serving</option></select></label>
+          <label class="field" id="basisAmountWrap">Basis amount (g/ml)<input id="basisAmount" type="number" min="0.01" step="any" value="100" required></label>
+        </div>
+        <div class="nutrition-inputs">
+          <label class="field">Energy (kcal)<input id="kcal" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Protein (g)<input id="protein" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Carbs (g)<input id="carbs" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Fat (g)<input id="fat" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Fibre (g)<input id="fibre" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Sugars (g)<input id="sugars" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Sodium (mg)<input id="sodium" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Salt (g)<input id="salt" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Calcium (mg)<input id="calcium" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Iron (mg)<input id="iron" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Potassium (mg)<input id="potassium" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Vitamin C (mg)<input id="vitaminC" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Vitamin A (µg RAE)<input id="vitaminA" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Vitamin D (µg)<input id="vitaminD" type="number" min="0" step="any" placeholder="Unknown"></label>
+          <label class="field">Vitamin B12 (µg)<input id="vitaminB12" type="number" min="0" step="any" placeholder="Unknown"></label>
+        </div>
+        <label class="field">Data source / notes<input id="sourceNote" maxlength="200" placeholder="e.g. package label, checked 19 Oct 2026"></label>
+        <label class="field">Product photo (optional)<input id="photoInput" type="file" accept="image/*" capture="environment"></label>
+        <div id="photoPreview" class="photo-preview" hidden></div>
+        <label class="check-row"><input type="checkbox" id="verifiedCheck"> I checked these values against the package or a reliable source.</label>
+        <div class="button-row"><button class="button primary" type="submit">Save food to diary</button><button class="button secondary" id="resetFormBtn" type="button">Clear form</button></div>
+        <p class="muted small">Values are scaled proportionally to the amount entered. This assumes the food's nutrient density is uniform; mixed dishes and drained/cooked weights may differ.</p>
+      </form>
+    </div>
+  </section>
+
+  <section class="page" id="page-foods">
+    <p class="eyebrow">YOUR FOOD LIBRARY</p><h2>My foods & recipes</h2>
+    <div class="card">
+      <h3>Saved foods</h3><p class="muted small">Save a food entry as a reusable item for faster logging later.</p>
+      <div id="savedFoods" class="entry-list"></div>
+    </div>
+    <div class="card">
+      <h3>Create a homemade recipe</h3>
+      <p class="muted small">Choose ingredients from your saved foods, enter the grams used, then save the recipe. Totals are only as reliable as the ingredient data you entered.</p>
+      <form id="recipeForm">
+        <label class="field">Recipe name<input id="recipeName" required maxlength="100" placeholder="e.g. Chicken and rice bowl"></label>
+        <label class="field">Number of portions<input id="recipeServings" type="number" min="1" step="1" value="2" required></label>
+        <div id="recipeIngredients"></div>
+        <button class="button secondary" id="addIngredientBtn" type="button">+ Add ingredient</button>
+        <button class="button primary full" type="submit">Save recipe</button>
+      </form>
+    </div>
+    <div class="card"><h3>Saved recipes</h3><div id="savedRecipes" class="entry-list"></div></div>
+  </section>
+
+  <section class="page" id="page-reports">
+    <p class="eyebrow">PATTERNS, NOT PERFECTION</p><h2>Weekly report</h2>
+    <div class="card">
+      <div class="section-heading"><div><h3>Last 7 days</h3><p class="muted small">Days with no logged food appear as zero; missing nutrient values are excluded from averages.</p></div><button class="button ghost small" id="exportBtn" type="button">Export CSV</button></div>
+      <div class="chart-wrap"><canvas id="weeklyChart" height="220" aria-label="Calories over the last seven days"></canvas></div>
+      <div class="report-grid" id="weeklyStats"></div>
+    </div>
+    <div class="card"><h3>Daily breakdown</h3><div id="dailyBreakdown" class="entry-list"></div></div>
+  </section>
+
+  <section class="page" id="page-settings">
+    <p class="eyebrow">PERSONAL SETTINGS</p><h2>Goals & data</h2>
+    <div class="card">
+      <h3>Daily goals</h3><p class="muted small">Goals are personal targets, not medical advice. Leave blank to track without a goal.</p>
+      <form id="goalsForm">
+        <div class="nutrition-inputs">
+          <label class="field">Calories (kcal)<input id="goalKcal" type="number" min="0" step="any" placeholder="No goal"></label>
+          <label class="field">Protein (g)<input id="goalProtein" type="number" min="0" step="any" placeholder="No goal"></label>
+          <label class="field">Carbs (g)<input id="goalCarbs" type="number" min="0" step="any" placeholder="No goal"></label>
+          <label class="field">Fat (g)<input id="goalFat" type="number" min="0" step="any" placeholder="No goal"></label>
+          <label class="field">Fibre (g)<input id="goalFibre" type="number" min="0" step="any" placeholder="No goal"></label>
+        </div><button class="button primary" type="submit">Save goals</button>
+      </form>
+    </div>
+    <div class="card">
+      <h3>Privacy & backup</h3>
+      <p class="muted small">Your food diary is stored in this browser on this device using IndexedDB. It is not uploaded to an account. Browser storage can be cleared by your browser or operating system, so export backups regularly.</p>
+      <div class="button-row"><button class="button secondary" id="backupBtn" type="button">Download backup JSON</button><label class="button secondary file-button">Restore backup<input id="restoreInput" type="file" accept="application/json" hidden></label></div>
+      <p id="backupStatus" class="status" role="status"></p>
+    </div>
+    <div class="card">
+      <h3>Accuracy & data limitations</h3>
+      <ul class="plain-list">
+        <li>Barcode identifies a product, not the amount eaten.</li>
+        <li>Online product records may be missing, outdated or user-submitted.</li>
+        <li>Unknown nutrients are shown as “—” and are not silently counted as zero.</li>
+        <li>Photos are stored on your device; large images use storage space.</li>
+        <li>Offline logging works for foods already entered or saved. New barcode lookups need internet.</li>
+      </ul>
+      <button class="button danger" id="deleteAllBtn" type="button">Delete all local data</button>
+    </div>
+  </section>
+</main>
+<footer><p>Made for personal use · Nutrition estimates are not medical advice.</p><p id="connectionStatus">Checking offline support…</p></footer>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
