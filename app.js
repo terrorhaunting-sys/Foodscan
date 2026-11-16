@@ -2,6 +2,9 @@
 const $ = id => document.getElementById(id);
 const DB_NAME = "PocketFoodTrackerDB", DB_VERSION = 1;
 let db, currentPhoto = null, currentProduct = null, scanner = null, savedCamera = false;
+// Set this to your deployed Cloudflare Worker URL (no API keys belong in this file).
+const PLATE_API_URL = "https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev/analyze";
+let platePhotoData = null, plateIngredients = [];
 const NUTRIENTS = [
   ["kcal","Energy","kcal"],["protein","Protein","g"],["carbs","Carbs","g"],["fat","Fat","g"],
   ["fibre","Fibre","g"],["sugars","Sugars","g"],["sodium","Sodium","mg"],["salt","Salt","g"],
@@ -285,6 +288,79 @@ async function photoChosen(file){
   currentPhoto=canvas.toDataURL("image/jpeg",.78);$("photoPreview").hidden=false;$("photoPreview").innerHTML=`<img src="${currentPhoto}" alt="Selected food photo">`;
  }catch{toast("Could not read that photo.");}
 }
+function fileToDataUrl(file, maxSide=1280, quality=.82){
+ return new Promise((resolve,reject)=>{
+  if(!file || !file.type.startsWith("image/")){reject(new Error("Choose an image file."));return;}
+  const img=new Image(),url=URL.createObjectURL(file);
+  img.onload=()=>{try{const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);URL.revokeObjectURL(url);resolve(canvas.toDataURL("image/jpeg",quality));}catch(e){URL.revokeObjectURL(url);reject(e)}};
+  img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("Could not read that image."))};img.src=url;
+ });
+}
+function plateNutrientNumber(value){const n=Number(value);return Number.isFinite(n)&&n>=0?n:0}
+function renderPlateIngredients(){
+ const host=$("plateIngredientList");host.replaceChildren();
+ plateIngredients.forEach((item,index)=>{
+  const card=document.createElement("article");card.className="plate-ingredient";
+  const heading=document.createElement("div");heading.className="plate-ingredient-heading";
+  const title=document.createElement("strong");title.textContent=`Ingredient ${index+1}`;
+  const remove=document.createElement("button");remove.type="button";remove.className="button ghost small";remove.textContent="Remove";remove.addEventListener("click",()=>{plateIngredients.splice(index,1);renderPlateIngredients()});heading.append(title,remove);card.append(heading);
+  const fields=[
+   ["name","Food name","text"],["grams","Amount (g)","number"],
+   ["kcal","Energy kcal / 100 g","number"],["protein","Protein g / 100 g","number"],
+   ["carbs","Carbs g / 100 g","number"],["fat","Fat g / 100 g","number"],
+   ["fibre","Fibre g / 100 g","number"],["sugars","Sugars g / 100 g","number"],
+   ["sodium","Sodium mg / 100 g","number"],["salt","Salt g / 100 g","number"],
+   ["calcium","Calcium mg / 100 g","number"],["iron","Iron mg / 100 g","number"],
+   ["potassium","Potassium mg / 100 g","number"],["vitaminC","Vitamin C mg / 100 g","number"],
+   ["vitaminA","Vitamin A µg / 100 g","number"],["vitaminD","Vitamin D µg / 100 g","number"],
+   ["vitaminB12","Vitamin B12 µg / 100 g","number"]
+  ];
+  const grid=document.createElement("div");grid.className="plate-edit-grid";
+  fields.forEach(([key,label,type])=>{const wrap=document.createElement("label");wrap.className="field";wrap.textContent=label;const input=document.createElement("input");input.type=type;input.min=type==="number"?"0":undefined;input.step=type==="number"?"any":undefined;input.required=key==="name"||key==="grams";input.value=item[key]??(key==="fibre"?"":"");input.setAttribute("aria-label",label);input.addEventListener("input",()=>{item[key]=type==="number"?(input.value===""?null:Number(input.value)):input.value;updatePlateTotals()});wrap.append(input);grid.append(wrap)});
+  card.append(grid);if(item.confidence){const confidence=document.createElement("p");confidence.className="muted small";confidence.textContent=`AI confidence: ${item.confidence}. Check this suggestion.`;card.append(confidence)}host.append(card);
+ });updatePlateTotals();
+}
+function updatePlateTotals(){
+ const keys=NUTRIENTS.map(([key])=>key),totals=Object.fromEntries(keys.map(k=>[k,0])),known=Object.fromEntries(keys.map(k=>[k,false]));let grams=0;
+ plateIngredients.forEach(item=>{const g=Number(item.grams);if(Number.isFinite(g)&&g>0)grams+=g;for(const k of keys){if(item[k]!==null&&item[k]!==undefined&&item[k]!==""&&Number.isFinite(Number(item[k]))){totals[k]+=Number(item[k])*Math.max(0,g||0)/100;known[k]=true}}});
+ const el=$("plateTotals");if(!el)return;
+ const groups=[
+  ["Calories & macros",["kcal","protein","carbs","fat","fibre"]],
+  ["Micronutrients",["sugars","sodium","salt","calcium","iron","potassium","vitaminC","vitaminA","vitaminD","vitaminB12"]]
+ ];
+ const label=Object.fromEntries(NUTRIENTS.map(([k,n,u])=>[k,[n,u]]));
+ el.replaceChildren();const heading=document.createElement("strong");heading.textContent=`Estimated meal totals · ${fmt(grams)} g`;el.append(heading);
+ groups.forEach(([groupName,groupKeys])=>{const section=document.createElement("section");section.className="plate-total-section";const h=document.createElement("h4");h.textContent=groupName;section.append(h);const grid=document.createElement("div");grid.className="plate-total-grid";groupKeys.forEach(k=>{const line=document.createElement("span"),name=document.createElement("span"),value=document.createElement("b");name.textContent=label[k][0];value.textContent=known[k]?`${fmt(totals[k])} ${label[k][1]}`:"Not available";line.append(name,value);grid.append(line)});section.append(grid);el.append(section)});
+}
+async function analyzePlate(){
+ if(!platePhotoData){setStatus("plateStatus","Take or choose a photo first.");return}
+ if(!PLATE_API_URL.startsWith("https://")||PLATE_API_URL.includes("YOUR-WORKER-NAME")){setStatus("plateStatus","Backend not configured yet. Deploy the secure Worker, then set PLATE_API_URL in app.js to its /analyze URL.");return}
+ const button=$("analyzePlateBtn");button.disabled=true;button.textContent="Analysing…";setStatus("plateStatus","Sending a resized photo to your secure AI backend…");$("plateResults").hidden=true;
+ try{
+  const response=await fetch(PLATE_API_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image:platePhotoData,locale:"South Africa",currency:"ZAR"})});
+  const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||`AI service returned ${response.status}.`);
+  if(!Array.isArray(data.ingredients)||!data.ingredients.length)throw new Error("The AI did not return ingredients. Try a clearer photo.");
+  plateIngredients=data.ingredients.slice(0,12).map(i=>{const n=i.nutritionPer100g||{};const item={name:String(i.name||"Unknown food").slice(0,100),grams:Math.max(1,Number(i.grams)||100),confidence:String(i.confidence||"low")};for(const [key] of NUTRIENTS)item[key]=n[key]==null?null:Math.max(0,Number(n[key])||0);return item});
+  $("plateMealName").value=String(data.mealName||"Scanned meal").slice(0,120);$("plateMealDate").value=$("diaryDate").value||today();$("plateNotes").value=String(data.notes||"AI photo estimate; confirm ingredients and portions").slice(0,240);$("plateResults").hidden=false;renderPlateIngredients();setStatus("plateStatus","Analysis complete. Correct the ingredient names, grams and nutrition values before saving.");
+ }catch(err){setStatus("plateStatus",(err.message||"Plate analysis failed.")+" You can still use manual entry.")}
+ finally{button.disabled=false;button.textContent="Analyse plate photo"}
+}
+async function confirmPlateMeal(){
+ const name=$("plateMealName").value.trim();if(!name||!plateIngredients.length){setStatus("plateStatus","Add a meal name and at least one ingredient.");return}
+ for(const item of plateIngredients){if(!String(item.name||"").trim()||!(Number(item.grams)>0)){setStatus("plateStatus","Every ingredient needs a name and a weight greater than zero grams.");return}}
+ const totals=Object.fromEntries(NUTRIENTS.map(([k])=>[k,null]));
+ for(const [k] of NUTRIENTS){const available=plateIngredients.filter(i=>i[k]!==null&&i[k]!==undefined&&i[k]!=="");if(available.length)totals[k]=available.reduce((sum,i)=>sum+Number(i[k])*Number(i.grams)/100,0)}
+ const grams=plateIngredients.reduce((sum,i)=>sum+Number(i.grams),0);const date=$("plateMealDate").value||today();
+ const item={id:uid(),date,name,meal:$("plateMealType").value,amount:grams,unit:"g",basisType:"100g",basisAmount:100,nutrients:totals,source:`AI photo estimate; ${$("plateNotes").value.trim()||"ingredients and portions reviewed by user"}`,verified:false,estimated:true,photo:platePhotoData,ingredients:plateIngredients.map(i=>({...i})),created:Date.now()};
+ await put("entries",item);await renderAll();$("diaryDate").value=date;await renderAll();clearPlateScanner();showPage("diary");toast("Estimated meal saved to your diary.");
+}
+function clearPlateScanner(){platePhotoData=null;plateIngredients=[];$("platePhotoInput").value="";$("platePhotoPreview").hidden=true;$("platePhotoPreview").replaceChildren();$("plateResults").hidden=true;$("plateIngredientList").replaceChildren();setStatus("plateStatus","AI analysis requires internet and a configured backend.")}
+async function choosePlatePhoto(file){
+ if(!file){return}if(file.size>15*1024*1024){setStatus("plateStatus","Choose an image smaller than 15 MB.");return}
+ try{platePhotoData=await fileToDataUrl(file);const img=document.createElement("img");img.src=platePhotoData;img.alt="Photo selected for meal analysis";$("platePhotoPreview").replaceChildren(img);$("platePhotoPreview").hidden=false;$("plateResults").hidden=true;plateIngredients=[];setStatus("plateStatus","Photo ready. Press Analyse plate photo to identify foods.")}
+ catch(err){setStatus("plateStatus",err.message||"Could not load photo.")}
+}
+
 function setup(){
  $("diaryDate").value=today();
  document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>showPage(b.dataset.page)));
@@ -292,6 +368,7 @@ function setup(){
  $("todayBtn").addEventListener("click",()=>{$("diaryDate").value=today();renderAll()});
  $("diaryDate").addEventListener("change",renderAll);
  $("lookupBtn").addEventListener("click",lookupBarcode);$("barcodeInput").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();lookupBarcode()}});
+ $("platePhotoInput").addEventListener("change",e=>choosePlatePhoto(e.target.files?.[0]));$("analyzePlateBtn").addEventListener("click",analyzePlate);$("clearPlateBtn").addEventListener("click",clearPlateScanner);$("confirmPlateBtn").addEventListener("click",confirmPlateMeal);
  $("cameraBtn").addEventListener("click",startCamera);$("stopCameraBtn").addEventListener("click",stopCamera);
  $("foodForm").addEventListener("submit",saveEntry);$("resetFormBtn").addEventListener("click",resetForm);
  $("basisType").addEventListener("change",()=>{const type=$("basisType").value;$("basisAmount").value=type==="serving"?1:100;$("basisAmountWrap").querySelector("label");$("basisAmountWrap").firstChild.textContent=type==="serving"?"Basis amount (servings)":"Basis amount (g/ml)"});

@@ -44,3 +44,13 @@ Keep `index.html`, `styles.css`, `app.js`, `manifest.json`, `sw.js`, and `icon.s
 ## 5. Important limitations
 
 No food tracker can guarantee 100% accuracy. Barcode matching, nutrition-label rounding, product reformulations, cooking methods, drained/cooked weights, and portion measurement all introduce uncertainty. Use label-checked values when possible. This app is a personal logging tool, not a medical device or medical advice.
+
+## 6. AI plate scanner (optional backend required)
+
+The Add food screen now includes an AI plate scanner with camera/photo upload, editable ingredients and gram portions, estimated macros, and a confirmation step before the meal is saved into the existing local diary.
+
+GitHub Pages is static hosting, so image recognition runs through the separate `plate-api/` Cloudflare Worker. Follow `plate-api/README.md` to deploy it securely. The frontend will not analyse photos until you replace the `PLATE_API_URL` placeholder near the top of `app.js` with your Worker URL ending in `/analyze`.
+
+- Never put an OpenAI API key in `app.js`, HTML, GitHub, or the Worker source. Store it using `npx wrangler secret put OPENAI_API_KEY`.
+- AI output is a rough estimate. Photo-only weights can be wrong, particularly with layered dishes, sauces, oil, hidden ingredients, and foods partly obscured. Edit ingredients and grams before confirming.
+- Plate analysis needs an internet connection and may incur AI API usage costs. Manual entry and the existing local diary remain available without it.

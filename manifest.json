@@ -1,7 +1,7 @@
 {
-  "name": "Pocket Food Tracker",
-  "short_name": "Food Tracker",
-  "description": "Private local-first food and nutrition diary",
+  "name": "Foodscan \u2014 Food & Nutrition Tracker",
+  "short_name": "Foodscan",
+  "description": "Food scanning, meal logging and nutrition tracking, with offline diary storage.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

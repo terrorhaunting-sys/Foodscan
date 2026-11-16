@@ -8,11 +8,11 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
-  <title>Pocket Food Tracker</title>
+  <title>Foodscan</title>
 </head>
 <body>
 <header class="app-header">
-  <div class="brand-row"><div class="brand-mark">PF</div><div><p class="eyebrow">YOUR PRIVATE FOOD DIARY</p><h1>Pocket Food Tracker</h1></div></div>
+  <div class="brand-row"><div class="brand-mark">PF</div><div><p class="eyebrow">YOUR PRIVATE FOOD DIARY</p><h1>Foodscan</h1></div></div>
   <p class="header-note">Log what you eat. Check the data. Keep it on this device.</p>
 </header>
 
@@ -53,6 +53,33 @@
 
   <section class="page" id="page-add">
     <p class="eyebrow">FOOD ENTRY</p><h2>Add food</h2>
+    <div class="card plate-scanner-card">
+      <div class="section-heading"><div><p class="eyebrow">AI MEAL ESTIMATOR</p><h3>Scan food on your plate</h3></div><span class="data-badge estimated">AI estimate</span></div>
+      <p class="muted small">Take a photo of your meal or choose one from your phone. AI suggests foods, portions, calories, macros and available micronutrients. Review every ingredient and estimate before saving.</p>
+      <label class="field">Meal photo
+        <input id="platePhotoInput" type="file" accept="image/*" capture="environment">
+      </label>
+      <div id="platePhotoPreview" class="plate-photo-preview" hidden></div>
+      <div class="button-row">
+        <button class="button primary" id="analyzePlateBtn" type="button">Analyse plate photo</button>
+        <button class="button secondary" id="clearPlateBtn" type="button">Clear photo</button>
+      </div>
+      <p id="plateStatus" class="status" role="status" aria-live="polite">AI analysis requires internet and a configured backend.</p>
+      <div id="plateResults" class="plate-results" hidden>
+        <div class="notice">These are estimates, not measured values. Edit names, grams, macros and available micronutrients per 100 g before confirming. Unknown values remain unavailable.</div>
+        <label class="field">Meal name<input id="plateMealName" maxlength="120" value="Scanned meal"></label>
+        <div class="form-grid two">
+          <label class="field">Meal<select id="plateMealType"><option>Breakfast</option><option>Lunch</option><option selected>Dinner</option><option>Snack</option></select></label>
+          <label class="field">Date<input id="plateMealDate" type="date"></label>
+        </div>
+        <div id="plateIngredientList" class="plate-ingredient-list"></div>
+        <div class="plate-total" id="plateTotals"></div>
+        <label class="field">Notes / cooking method<input id="plateNotes" maxlength="240" placeholder="e.g. grilled, little oil; AI photo estimate"></label>
+        <button class="button primary full" id="confirmPlateBtn" type="button">Confirm and save meal to diary</button>
+        <p class="muted small">The meal is not saved until you press Confirm. Saved as one meal entry with editable ingredient details.</p>
+      </div>
+    </div>
+
     <div class="card">
       <h3>Scan or search a packaged product</h3>
       <p class="muted small">Barcode lookup needs internet. Compare returned data with your package label before saving.</p>
